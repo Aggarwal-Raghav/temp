@@ -1,0 +1,29 @@
+logging:
+  level:
+    com.example.mcp: INFO
+    org.apache.iceberg: WARN
+
+server:
+  ssl:
+    enabled: true
+    client-auth: need # Strict Mutual TLS
+    key-store: file:/etc/security/pki/server-keystore.p12 # Absolute paths in prod
+    key-store-password: ${SSL_KEYSTORE_PASSWORD} # Inject via Env Var
+    trust-store: file:/etc/security/pki/truststore.p12
+    trust-store-password: ${SSL_TRUSTSTORE_PASSWORD}
+
+app:
+  iceberg:
+    warehouse-location: s3a://prod-warehouse-bucket/
+    catalog-uri: thrift://prod-hive-metastore:9083
+  kerberos:
+    enabled: true
+    principal: hive/mcp-prod@PROD.EXAMPLE.COM
+    keytab-location: /etc/security/keytabs/mcp-server.keytab
+    krb5-conf: /etc/krb5.conf
+    renewal-interval-ms: 3600000
+  hadoop:
+    core-site: /etc/hadoop/conf/core-site.xml
+    hdfs-site: /etc/hadoop/conf/hdfs-site.xml
+  hive:
+    hive-site: /etc/hive/conf/hive-site.xml

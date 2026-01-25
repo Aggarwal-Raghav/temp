@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: iceberg-mcp-server
+  # Common default, can be overridden in specific profiles
+  main:
+    banner-mode: console
+
+# Default Server Port (can be overridden)
+server:
+  port: 8443
+
+# Common Logging defaults
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
