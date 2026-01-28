@@ -1,0 +1,127 @@
+Hive to Iceberg Snapshot Migration Tool
+
+This guide explains how to build and run the SnapshotMigrationTool using JDK 17, Hive 3, and Iceberg 1.4.3.
+
+1. Prerequisites
+
+Java 17 (Required for compilation and runtime)
+
+Apache Maven 3.6+
+
+Apache Spark 3.3, 3.4, or 3.5 (Match the iceberg-runtime version)
+
+Hadoop/Hive Configs: Ensure hive-site.xml and core-site.xml are available on the classpath or in the Spark configuration directory.
+
+2. Maven Dependencies (pom.xml)
+
+Add the following dependencies to your project to support the code logic.
+
+<properties>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <spark.version>3.5.0</spark.version> <!-- Adjust to match your cluster -->
+    <iceberg.version>1.4.3</iceberg.version>
+    <scala.binary.version>2.12</scala.binary.version>
+</properties>
+
+<dependencies>
+    <!-- Spark SQL -->
+    <dependency>
+        <groupId>org.apache.spark</groupId>
+        <artifactId>spark-sql_${scala.binary.version}</artifactId>
+        <version>${spark.version}</version>
+        <scope>provided</scope> <!-- Provided by the cluster -->
+    </dependency>
+
+    <!-- Iceberg Spark Runtime (Include this in the shaded jar if not on cluster) -->
+    <dependency>
+        <groupId>org.apache.iceberg</groupId>
+        <artifactId>iceberg-spark-runtime-3.5_${scala.binary.version}</artifactId>
+        <version>${iceberg.version}</version>
+    </dependency>
+</dependencies>
+
+<build>
+    <plugins>
+        <!-- Use Maven Shade Plugin to create a Fat JAR -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-shade-plugin</artifactId>
+            <version>3.4.1</version>
+            <executions>
+                <execution>
+                    <phase>package</phase>
+                    <goals>
+                        <goal>shade</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+
+
+3. Building the JAR
+
+Run the following command in your project root:
+
+mvn clean package
+
+
+This will generate a shaded JAR file (e.g., migration-tool-1.0-SNAPSHOT.jar) in the target/ directory.
+
+4. Running with Spark Submit
+
+Use spark-submit to execute the migration. You must ensure the Spark Catalog configurations match those in the code, or rely on the code's internal builder.
+
+Option A: Migrate an Entire Database
+
+Pass the database name (e.g., retail_db) as the last argument. The tool will scan for all non-Iceberg Hive tables in that database.
+
+spark-submit \
+  --class com.data.migration.SnapshotMigrationTool \
+  --master yarn \
+  --deploy-mode client \
+  --driver-memory 4g \
+  --executor-memory 4g \
+  --num-executors 4 \
+  --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+  --conf spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog \
+  --conf spark.sql.catalog.spark_catalog.type=hive \
+  target/migration-tool-1.0-SNAPSHOT.jar \
+  retail_db
+
+
+Option B: Migrate a Single Table
+
+Pass the fully qualified table name (e.g., retail_db.transactions) to migrate just that specific table.
+
+spark-submit \
+  --class com.data.migration.SnapshotMigrationTool \
+  --master yarn \
+  --deploy-mode client \
+  --driver-memory 4g \
+  --executor-memory 4g \
+  --num-executors 4 \
+  --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+  --conf spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog \
+  --conf spark.sql.catalog.spark_catalog.type=hive \
+  target/migration-tool-1.0-SNAPSHOT.jar \
+  retail_db.transactions
+
+
+Important Notes on Execution
+
+Hive Metastore Connectivity: The Spark session needs to talk to HMS. Ensure --files /etc/hive/conf/hive-site.xml is passed if HIVE_CONF_DIR is not set on the cluster.
+
+Permissions: The user running the job needs:
+
+SELECT on the source Hive table.
+
+CREATE privileges on the database (to create the staging/Iceberg tables).
+
+DROP privileges (to remove the staging table).
+
+HDFS/S3 write permissions for the table location.
+
+Logs: Check the driver logs (stdout) for the "MIGRATION REPORT" summary printed at the end of the job.
